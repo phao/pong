@@ -1,0 +1,24 @@
+clamp.fabs.c
+
+real	0m1.507s
+user	0m1.445s
+sys	0m0.060s
+
+clamp.fabsf.c
+
+real	0m1.060s
+user	0m1.027s
+sys	0m0.032s
+
+clamp.tern.double.c
+
+real	0m1.346s
+user	0m1.288s
+sys	0m0.056s
+
+clamp.tern.float.c
+
+real	0m1.141s
+user	0m1.107s
+sys	0m0.032s
+

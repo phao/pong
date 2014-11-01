@@ -1,0 +1,12 @@
+This is a series of microbenchmarks I did for some methods of clamping
+floating values having min=0 and max being a parameter.
+
+The absolute value based techniques are pretty cool.
+
+Check MY_* files for information on my execution of the benchmarks. The
+output of mbench is in MY_RESULTS.
+
+  * MY_PROC_CPUINFO: This has the contents of my `/proc/cpuinfo`.
+  * MY_PROC_MEMINFO: This has the contents of my `/proc/meminfo`.
+  * MY_GCC-V: This has the output of running `gcc -v`.
+  * MY_RESULTS: this has the output of running `./mbench`.

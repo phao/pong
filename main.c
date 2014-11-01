@@ -35,7 +35,7 @@ struct Game {
 
 enum {
   RACKET_WIDTH = 20,
-  RACKET_HEIGHT = RACKET_WIDTH*2,
+  RACKET_HEIGHT = RACKET_WIDTH*3,
   PONG_BALL_SIZE = 20,
   MIDLINE_POINT_WIDTH = 3,
   MIDLINE_POINT_HEIGHT = 2*MIDLINE_POINT_WIDTH,
@@ -110,15 +110,23 @@ handle_event(struct PlayState *p, SDL_Event *e) {
   p->player.dy = 0;
 }
 
+/**
+ * Clamps x. If x < 0, then returns 0. If x > max, then returns max.
+ */
+float
+fclamp0(float x, float max) {
+  return x > max ? max : (x < 0.0f ? 0.0f : x);
+
+  /* Note: check the folder 'mbench' for some microbenchmarks on different
+   * methods for clamping. As of now, there are 4 different methods in there.
+   * And this one is about 7% slower than the faster one (on my machine
+   * according to the microbenchmarks). */
+}
+
 void
-move_racket(struct Racket *r, Uint32 delta, float minY, float maxY) {
+move_racket(struct Racket *r, Uint32 delta, float maxY) {
   r->y += delta * (float)RACKET_SPEED/1000.0f * r->dy;
-  if (r->y < minY) {
-    r->y = minY;
-  }
-  else if (r->y > maxY) {
-    r->y = maxY;
-  }
+  r->y = fclamp0(r->y, maxY);
 }
 
 void
@@ -126,8 +134,9 @@ play(struct PlayState *p, const struct Dimensions *screen, Uint32 now) {
   Uint32 delta;
 
   delta = now - p->last_update;
-  move_racket(&p->player, delta, 0, screen->height-RACKET_HEIGHT);
-  move_racket(&p->enemy, delta, 0, screen->height-RACKET_HEIGHT);
+  move_racket(&p->player, delta, screen->height-RACKET_HEIGHT);
+  move_racket(&p->enemy, delta, screen->height-RACKET_HEIGHT);
+  move_pong_ball(
   p->last_update = now;
 }
 
@@ -162,7 +171,7 @@ midline_npoints(const struct Dimensions *screen) {
 
 void
 render_midline(SDL_Renderer *r, const struct Dimensions *screen) {
-  int npoints, i;
+  int npoints;
   SDL_Rect mpoint;
 
   npoints = midline_npoints(screen);
@@ -171,8 +180,7 @@ render_midline(SDL_Renderer *r, const struct Dimensions *screen) {
   mpoint.w = MIDLINE_POINT_WIDTH;
   mpoint.h = MIDLINE_POINT_HEIGHT;
   SDL_RenderFillRect(r, &mpoint);
-  npoints--;
-  for (i = 0; i < npoints; i++) {
+  while (--npoints > 0) {
     mpoint.y += MIDLINE_POINT_HEIGHT + MIDLINE_POINT_MARGIN;
     SDL_RenderFillRect(r, &mpoint);
   }
@@ -196,7 +204,7 @@ render(SDL_Renderer *r,
 void
 game_main(struct Game *g) {
   enum {
-    FPS = 30,
+    FPS = 60,
     SEC = 1000,
     MAX_WAIT = SEC/FPS
   };

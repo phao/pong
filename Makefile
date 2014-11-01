@@ -1,7 +1,7 @@
 CC=gcc
 DEBUG_OPTS=-g
 OPTIMIZATION_OPTS=-O3
-CC_DEFAULT_OPTS=-Wall -Wextra -ansi -pedantic $(DEBUG_OPTS) \
+CC_DEFAULT_OPTS=-Wall -Wextra -std=c99 -pedantic $(DEBUG_OPTS) \
 	$(OPTIMIZATION_OPTS)
 
 # Other options for SDL extension libraries include -lSDL2_ttf -lSDL2_mixer.
