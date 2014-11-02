@@ -338,8 +338,8 @@ run_collisions(struct PlayState *p, Uint32 delta) {
   ball = &p->ball;
   player = &p->player;
   enemy = &p->enemy;
-  xp = ball->x + ball->dx*delta*RACKET_MS_SPEED;
-  yp = ball->y + ball->dy*delta*RACKET_MS_SPEED;
+  xp = ball->x + ball->dx*delta*PONG_BALL_MS_SPEED;
+  yp = ball->y + ball->dy*delta*PONG_BALL_MS_SPEED;
 
   // A ball can collide with the top/bottom walls, in which case its dy changes
   // sign.
