@@ -73,7 +73,7 @@ struct DigitRenderingContext {
 enum {
   RACKET_WIDTH = 20,
   RACKET_HEIGHT = RACKET_WIDTH*3,
-  RACKET_SPEED = 350 /* Pixels per second. */
+  RACKET_SPEED = 450 /* Pixels per second. */
 };
 
 const float RACKET_MS_SPEED = RACKET_SPEED/1000.0f;
@@ -84,6 +84,11 @@ enum {
 };
 
 const float PONG_BALL_MS_SPEED = PONG_BALL_SPEED/1000.0f;
+
+const float RACKET_HITBACK_MAXANGLE = 85.0f*M_PI/180.0f;
+
+// The maximum distance of middles of racket and ball within a hit.
+const float MAX_HIT_DISTANCE = RACKET_HEIGHT/2.0f + PONG_BALL_SIZE/2.0f;
 
 enum {
   MIDLINE_POINT_WIDTH = 3,
@@ -106,6 +111,9 @@ enum {
   BG_A = 255
 };
 
+// The distance the enemy is willing to tolerate and wait before he starts
+// to go after the ball. If the ball is less than ENEMY_WAIT_TOLERANCE pixels
+// above/below is center, it'll wait; otherwise it'll pursue the ball.
 const float ENEMY_WAIT_TOLERANCE = RACKET_HEIGHT/5.0f;
 
 enum {
@@ -305,18 +313,44 @@ play_enemy(struct Racket *enemy, const struct PongBall *ball) {
   }
 }
 
+/**
+ * This function does both the checking for racket/ball collision and the
+ * update of the ball state if the collision indeed happened.
+ *
+ * @return 1 for if collision happened and 0 otherwise.
+ */
 int
-ball_yhits_racket(const struct PongBall *ball, const struct Racket *racket) {
-  float by0, by1;
-  float ry0, ry1;
+ball_yhits_racket(struct PongBall *ball, const struct Racket *racket) {
+  float by0, by1, mby;
+  float ry0, ry1, mry;
+  float mid_distance, angle;
+  int happened;
 
   by0 = ball->y;
   by1 = ball->y + PONG_BALL_SIZE;
   ry0 = racket->y;
   ry1 = racket->y + RACKET_HEIGHT;
 
-  return (ry0 < by0 && by0 < ry1) ||
-         (ry0 < by1 && by1 < ry1);
+  happened = (ry0 < by0 && by0 < ry1) || (ry0 < by1 && by1 < ry1);
+  if (!happened) {
+    return 0;
+  }
+
+  // Generates an angle from -50deg to 50deg depending on where the ball hit
+  // the racket. If in the upmost point then +50deg; if in the downmost point
+  // then -50deg; 0deg if in the middle.
+  //
+  // The actual min/max angles are named constants.
+
+  mby = by0 + PONG_BALL_SIZE/2.0f;
+  mry = ry0 + RACKET_HEIGHT/2.0f;
+  mid_distance = mry - mby;
+  angle = RACKET_HITBACK_MAXANGLE * (mid_distance/MAX_HIT_DISTANCE);
+
+  ball->dy = -sinf(angle); // Y increases as you go down, not up.
+  ball->dx = ball->dx < 0 ? cosf(angle) : -cosf(angle);
+
+  return 1;
 }
 
 void
@@ -332,12 +366,9 @@ score(struct PongBall *ball, int *benefit) {
 void
 run_collisions(struct PlayState *p, Uint32 delta) {
   struct PongBall *ball;
-  struct Racket *player, *enemy;
   float xp, yp; // These are x prime and y prime, the next (x,y) for ball.
 
   ball = &p->ball;
-  player = &p->player;
-  enemy = &p->enemy;
   xp = ball->x + ball->dx*delta*PONG_BALL_MS_SPEED;
   yp = ball->y + ball->dy*delta*PONG_BALL_MS_SPEED;
 
@@ -349,18 +380,12 @@ run_collisions(struct PlayState *p, Uint32 delta) {
 
   // If a ball reaches the region before any racket...
   if (xp < RACKET_WIDTH) { // player
-    if (ball_yhits_racket(ball, player)) {
-      toggle_ball(ball);
-    }
-    else {
+    if (!ball_yhits_racket(ball, &p->player)) {
       score(ball, &p->score.enemy);
     }
   }
   else if (xp > p->frame->width - RACKET_WIDTH - PONG_BALL_SIZE) { // enemy
-    if (ball_yhits_racket(ball, enemy)) {
-      toggle_ball(ball);
-    }
-    else {
+    if (!ball_yhits_racket(ball, &p->enemy)) {
       score(ball, &p->score.player);
     }
   }
