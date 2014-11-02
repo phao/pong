@@ -4,8 +4,7 @@ OPTIMIZATION_OPTS=-O3
 CC_DEFAULT_OPTS=-Wall -Wextra -std=c99 -pedantic $(DEBUG_OPTS) \
 	$(OPTIMIZATION_OPTS)
 
-# Other options for SDL extension libraries include -lSDL2_ttf -lSDL2_mixer.
-LINKER_OPTS=-lSDL2 -lSDL2_image -lm
+LINKER_OPTS=-lSDL2 -lm
 
 OBJS=main.o
 

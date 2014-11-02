@@ -113,7 +113,7 @@ enum {
 };
 
 enum {
-  DIGIT_PIECE_SIZE = 10,
+  DIGIT_PIECE_SIZE = 7,
   DIGIT_HEIGHT = 5, // In DIGIT_PIECE_SIZE units.
   DIGIT_WIDTH = 5, // In DIGIT_PIECE_SIZE units.
   DIGIT_INNER_MARGIN = 1, // In DIGIT_PIECE_SIZE units.
@@ -330,7 +330,7 @@ score(struct PongBall *ball, int *benefit) {
  * current play state.
  */
 void
-run_collisions(struct PlayState *p) {
+run_collisions(struct PlayState *p, Uint32 delta) {
   struct PongBall *ball;
   struct Racket *player, *enemy;
   float xp, yp; // These are x prime and y prime, the next (x,y) for ball.
@@ -338,8 +338,8 @@ run_collisions(struct PlayState *p) {
   ball = &p->ball;
   player = &p->player;
   enemy = &p->enemy;
-  xp = ball->x + ball->dx;
-  yp = ball->y + ball->dy;
+  xp = ball->x + ball->dx*delta*RACKET_MS_SPEED;
+  yp = ball->y + ball->dy*delta*RACKET_MS_SPEED;
 
   // A ball can collide with the top/bottom walls, in which case its dy changes
   // sign.
@@ -377,7 +377,7 @@ play(struct PlayState *p, Uint32 now) {
   Uint32 delta;
 
   delta = now - p->last_update;
-  run_collisions(p);
+  run_collisions(p, delta);
   play_enemy(&p->enemy, &p->ball);
   play_movements(p, delta);
   p->last_update = now;
@@ -436,7 +436,10 @@ render_midline(SDL_Renderer *r, const struct Dimensions *screen) {
 }
 
 void
-render_digit(SDL_Renderer *r, int digit, const struct DigitRenderingContext *cx) {
+render_digit(SDL_Renderer *r,
+             int digit,
+             const struct DigitRenderingContext *cx)
+{
   const char (*graphic)[DIGIT_HEIGHT][DIGIT_WIDTH+1];
   SDL_Rect digit_rect;
   int i, j, sign_offset, acc_offset, midline_x;
@@ -575,12 +578,14 @@ run_game(struct Game* g, const char *title) {
 
 int
 main(int argc, char *argv[]) {
-  const char *TITLE = "Pong";
+  const char *TITLE = "PONG";
 
   struct Game game;
 
-  game.video.dim.width = 640;
-  game.video.dim.height = 480;
+  game.video.dim = (struct Dimensions) {
+    .width = 640,
+    .height = 480
+  };
 
   run_game(&game, TITLE);
   if (errorFn) {
