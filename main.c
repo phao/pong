@@ -1,6 +1,17 @@
+#include <assert.h>
+#include <math.h>
 #include <stdio.h>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 #include <SDL2/SDL.h>
+
+enum Direction {
+  LEFT = -1,
+  RIGHT = 1
+};
 
 typedef const char* (*ErrorFn)(void);
 
@@ -15,17 +26,32 @@ struct GameVideo {
 };
 
 struct PongBall {
+  // dy and dx should be such that dy^2 + dx^2 is 1. Collectively, they form
+  // the unit direction vector of the pong ball.
   float x, y, dx, dy;
+
+  // Dimmensions of the frame within which the ball is.
+  const struct Dimensions *within;
 };
 
 struct Racket {
+  // dy should be 0, 1 or -1. It's only to indicate the direction of the
+  // change in y.
   float y, dy;
+};
+
+struct Score {
+  int player, enemy;
 };
 
 struct PlayState {
   struct Racket player, enemy;
-  struct PongBall pong;
+  struct PongBall ball;
   Uint32 last_update;
+  struct Score score;
+
+  // Dimmensions of the frame within which the game is played.
+  const struct Dimensions *frame;
 };
 
 struct Game {
@@ -33,15 +59,37 @@ struct Game {
   struct PlayState play;
 };
 
+struct DigitRenderingContext {
+  int x_offset; // Offset from the midline.
+  enum Direction direction; // The direction to write.
+
+  // Dimensions within which the digit is being written. Serves to compute the
+  // midline.
+  const struct Dimensions *within;
+};
+
+/** Size values are in pixels by default, unless specified otheriwse. */
+
 enum {
   RACKET_WIDTH = 20,
   RACKET_HEIGHT = RACKET_WIDTH*3,
+  RACKET_SPEED = 350 /* Pixels per second. */
+};
+
+const float RACKET_MS_SPEED = RACKET_SPEED/1000.0f;
+
+enum {
   PONG_BALL_SIZE = 20,
+  PONG_BALL_SPEED = 11*(RACKET_SPEED/10)
+};
+
+const float PONG_BALL_MS_SPEED = PONG_BALL_SPEED/1000.0f;
+
+enum {
   MIDLINE_POINT_WIDTH = 3,
   MIDLINE_POINT_HEIGHT = 2*MIDLINE_POINT_WIDTH,
   MIDLINE_POINT_MARGIN = 3,
-  MIDLINE_PADDING = 20,
-  RACKET_SPEED = 250 /* Pixels per second. */
+  MIDLINE_PADDING = 20
 };
 
 enum {
@@ -56,6 +104,82 @@ enum {
   BG_G = 0,
   BG_B = 0,
   BG_A = 255
+};
+
+const float ENEMY_WAIT_TOLERANCE = RACKET_HEIGHT/5.0f;
+
+enum {
+  END_SCORE = 10
+};
+
+enum {
+  DIGIT_PIECE_SIZE = 10,
+  DIGIT_HEIGHT = 5, // In DIGIT_PIECE_SIZE units.
+  DIGIT_WIDTH = 5, // In DIGIT_PIECE_SIZE units.
+  DIGIT_INNER_MARGIN = 1, // In DIGIT_PIECE_SIZE units.
+  DIGIT_OUTER_MARGIN = 2 // In DIGIT_PIECE_SIZE units.
+};
+
+const char SCORE_DIGITS[10][DIGIT_HEIGHT][DIGIT_WIDTH+1] = {
+  {" ****",
+   "*   *",
+   "* * *",
+   "*   *",
+   "*****"},
+
+  {"  *  ",
+   " **  ",
+   "  *  ",
+   "  *  ",
+   "*****"},
+
+  {" ****",
+   "    *",
+   "*****",
+   "*    ",
+   "*****"},
+
+  {"*****",
+   "    *",
+   " ****",
+   "    *",
+   "*****"},
+
+  {"*   *",
+   "*   *",
+   "*****",
+   "    *",
+   "    *"},
+
+  {"**** ",
+   "*    ",
+   "*****",
+   "    *",
+   "*****"},
+
+  {"**** ",
+   "*    ",
+   "*****",
+   "*   *",
+   "*****"},
+
+  {"*****",
+   "*   *",
+   "    *",
+   "    *",
+   "    *"},
+
+  {"*****",
+   "*   *",
+   "*****",
+   "*   *",
+   "*****"},
+
+  {"*****",
+   "*   *",
+   "*****",
+   "    *",
+   "    *"},
 };
 
 ErrorFn errorFn = 0;
@@ -80,12 +204,33 @@ init_video(struct GameVideo* gv, const char *title) {
 }
 
 void
-init_play(struct PlayState *p, const struct Dimensions *screen) {
-  p->enemy.y = p->player.y = screen->height/2 - RACKET_HEIGHT/2;
-  p->pong.dx = -1;
-  p->pong.dy = 0;
-  p->pong.x = screen->width/2 - PONG_BALL_SIZE/2;
-  p->pong.y = screen->height/2 - PONG_BALL_SIZE/2;
+toggle_ball(struct PongBall *ball) {
+  float angle;
+
+  angle = rand()/(float)RAND_MAX * M_PI/1.8f - 5.0f*M_PI/18.0f;
+  ball->dy = sinf(angle);
+  ball->dx = ball->dx < 0 ? cosf(angle) : -cosf(angle);
+}
+
+void
+reset_pong_ball(struct PongBall *ball) {
+  ball->x = ball->within->width/2 - PONG_BALL_SIZE/2.0f;
+  ball->y = ball->within->height/2 - PONG_BALL_SIZE/2.0f;
+  toggle_ball(ball);
+}
+
+void
+init_play(struct PlayState *p, const struct Dimensions *frame) {
+  p->frame = frame;
+  p->enemy.y = p->player.y = frame->height/2.0f - RACKET_HEIGHT/2.0f;
+  p->ball.within = frame;
+  p->ball.dx = 0;
+  p->ball.dy = 0;
+  reset_pong_ball(&p->ball);
+  p->score = (struct Score) {
+    .player = 0,
+    .enemy = 0
+  };
 }
 
 void
@@ -119,24 +264,122 @@ fclamp0(float x, float max) {
 
   /* Note: check the folder 'mbench' for some microbenchmarks on different
    * methods for clamping. As of now, there are 4 different methods in there.
-   * And this one is about 7% slower than the faster one (on my machine
+   * And this one is about 5-10% slower than the faster one (on my machine
    * according to the microbenchmarks). */
 }
 
 void
 move_racket(struct Racket *r, Uint32 delta, float maxY) {
-  r->y += delta * (float)RACKET_SPEED/1000.0f * r->dy;
+  r->y += delta * RACKET_MS_SPEED * r->dy;
   r->y = fclamp0(r->y, maxY);
 }
 
 void
-play(struct PlayState *p, const struct Dimensions *screen, Uint32 now) {
+move_pong_ball(struct PongBall *ball, Uint32 delta) {
+  ball->x += ball->dx * delta * PONG_BALL_MS_SPEED;
+  ball->y += ball->dy * delta * PONG_BALL_MS_SPEED;
+  ball->x = fclamp0(ball->x, ball->within->width);
+  ball->y = fclamp0(ball->y, ball->within->height - PONG_BALL_SIZE);
+}
+
+void
+play_movements(struct PlayState *p, Uint32 delta) {
+  move_racket(&p->player, delta, p->frame->height - RACKET_HEIGHT);
+  move_racket(&p->enemy, delta, p->frame->height - RACKET_HEIGHT);
+  move_pong_ball(&p->ball, delta);
+}
+
+void
+play_enemy(struct Racket *enemy, const struct PongBall *ball) {
+  float pong_middle_y, middle_y, diff, abs_diff;
+
+  middle_y = enemy->y + RACKET_HEIGHT/2.0f;
+  pong_middle_y = ball->y + PONG_BALL_SIZE/2.0f;
+  diff = middle_y - pong_middle_y;
+  abs_diff = fabsf(diff);
+  if (abs_diff <= ENEMY_WAIT_TOLERANCE) {
+    enemy->dy = 0;
+  }
+  else {
+    enemy->dy = -diff / abs_diff;
+  }
+}
+
+int
+ball_yhits_racket(const struct PongBall *ball, const struct Racket *racket) {
+  float by0, by1;
+  float ry0, ry1;
+
+  by0 = ball->y;
+  by1 = ball->y + PONG_BALL_SIZE;
+  ry0 = racket->y;
+  ry1 = racket->y + RACKET_HEIGHT;
+
+  return (ry0 < by0 && by0 < ry1) ||
+         (ry0 < by1 && by1 < ry1);
+}
+
+void
+score(struct PongBall *ball, int *benefit) {
+  ++*benefit;
+  reset_pong_ball(ball);
+}
+
+/**
+ * Checks if there will be any collisions if a movement happens given the
+ * current play state.
+ */
+void
+run_collisions(struct PlayState *p) {
+  struct PongBall *ball;
+  struct Racket *player, *enemy;
+  float xp, yp; // These are x prime and y prime, the next (x,y) for ball.
+
+  ball = &p->ball;
+  player = &p->player;
+  enemy = &p->enemy;
+  xp = ball->x + ball->dx;
+  yp = ball->y + ball->dy;
+
+  // A ball can collide with the top/bottom walls, in which case its dy changes
+  // sign.
+  if (yp > p->frame->height - PONG_BALL_SIZE || yp < 0.0f) {
+    ball->dy = -ball->dy;
+  }
+
+  // If a ball reaches the region before any racket...
+  if (xp < RACKET_WIDTH) { // player
+    if (ball_yhits_racket(ball, player)) {
+      toggle_ball(ball);
+    }
+    else {
+      score(ball, &p->score.enemy);
+    }
+  }
+  else if (xp > p->frame->width - RACKET_WIDTH - PONG_BALL_SIZE) { // enemy
+    if (ball_yhits_racket(ball, enemy)) {
+      toggle_ball(ball);
+    }
+    else {
+      score(ball, &p->score.player);
+    }
+  }
+}
+
+void
+reset_game(struct PlayState *p) {
+  p->last_update = SDL_GetTicks();
+  init_play(p, p->frame);
+}
+
+void
+play(struct PlayState *p, Uint32 now) {
   Uint32 delta;
 
   delta = now - p->last_update;
-  move_racket(&p->player, delta, screen->height-RACKET_HEIGHT);
-  move_racket(&p->enemy, delta, screen->height-RACKET_HEIGHT);
-  move_pong_ball(
+  run_collisions(p);
+  play_enemy(&p->enemy, &p->ball);
+  play_movements(p, delta);
   p->last_update = now;
 }
 
@@ -144,22 +387,26 @@ void
 render_racket(SDL_Renderer *r, int x, int y) {
   SDL_Rect racket;
 
-  racket.x = x;
-  racket.y = y;
-  racket.w = RACKET_WIDTH;
-  racket.h = RACKET_HEIGHT;
+  racket = (SDL_Rect) {
+    .x = x,
+    .y = y,
+    .w = RACKET_WIDTH,
+    .h = RACKET_HEIGHT
+  };
   SDL_RenderFillRect(r, &racket);
 }
 
 void
-render_pong_ball(SDL_Renderer *r, const struct PongBall *pong) {
-  SDL_Rect ball;
+render_pong_ball(SDL_Renderer *r, const struct PongBall *ball) {
+  SDL_Rect ball_rect;
 
-  ball.x = pong->x;
-  ball.y = pong->y;
-  ball.w = PONG_BALL_SIZE;
-  ball.h = PONG_BALL_SIZE;
-  SDL_RenderFillRect(r, &ball);
+  ball_rect = (SDL_Rect) {
+    .x = ball->x,
+    .y = ball->y,
+    .w = PONG_BALL_SIZE,
+    .h = PONG_BALL_SIZE
+  };
+  SDL_RenderFillRect(r, &ball_rect);
 }
 
 int
@@ -175,10 +422,12 @@ render_midline(SDL_Renderer *r, const struct Dimensions *screen) {
   SDL_Rect mpoint;
 
   npoints = midline_npoints(screen);
-  mpoint.x = screen->width/2 - MIDLINE_POINT_WIDTH/2;
-  mpoint.y = MIDLINE_PADDING;
-  mpoint.w = MIDLINE_POINT_WIDTH;
-  mpoint.h = MIDLINE_POINT_HEIGHT;
+  mpoint = (SDL_Rect) {
+    .x = screen->width/2 - MIDLINE_POINT_WIDTH/2,
+    .y = MIDLINE_PADDING,
+    .w = MIDLINE_POINT_WIDTH,
+    .h = MIDLINE_POINT_HEIGHT
+  };
   SDL_RenderFillRect(r, &mpoint);
   while (--npoints > 0) {
     mpoint.y += MIDLINE_POINT_HEIGHT + MIDLINE_POINT_MARGIN;
@@ -187,18 +436,100 @@ render_midline(SDL_Renderer *r, const struct Dimensions *screen) {
 }
 
 void
-render(SDL_Renderer *r,
-       const struct PlayState *p,
-       const struct Dimensions *screen)
+render_digit(SDL_Renderer *r, int digit, const struct DigitRenderingContext *cx) {
+  const char (*graphic)[DIGIT_HEIGHT][DIGIT_WIDTH+1];
+  SDL_Rect digit_rect;
+  int i, j, sign_offset, acc_offset, midline_x;
+
+  digit_rect.w = digit_rect.h = DIGIT_PIECE_SIZE;
+  graphic = &SCORE_DIGITS[digit];
+  sign_offset = cx->direction == LEFT ? 0 : DIGIT_WIDTH*DIGIT_PIECE_SIZE;
+  midline_x = cx->within->width/2;
+  acc_offset = midline_x + cx->x_offset + sign_offset;
+
+  for (i = 0; i < DIGIT_HEIGHT; i++) {
+    for (j = 0; j < DIGIT_WIDTH; j++) {
+      if ((*graphic)[i][DIGIT_WIDTH-j-1] == '*') {
+        digit_rect.y = (DIGIT_OUTER_MARGIN + i)*DIGIT_PIECE_SIZE;
+        digit_rect.x = acc_offset - (j+1)*DIGIT_PIECE_SIZE;
+        SDL_RenderFillRect(r, &digit_rect);
+      }
+    }
+  }
+}
+
+void
+render_single_score(SDL_Renderer *r,
+                    int score,
+                    struct DigitRenderingContext *cx)
 {
+  int first_offset, second_offset;
+
+  assert(score >= 0);
+  assert(score <= 10);
+
+  first_offset = cx->direction * DIGIT_OUTER_MARGIN*DIGIT_PIECE_SIZE;
+  second_offset = cx->direction *
+    DIGIT_PIECE_SIZE*(DIGIT_OUTER_MARGIN + DIGIT_INNER_MARGIN + DIGIT_WIDTH);
+
+  if (cx->direction == RIGHT && score == 10) {
+    first_offset = first_offset ^ second_offset;
+    second_offset = first_offset ^ second_offset;
+    first_offset = first_offset ^ second_offset;
+  }
+
+  cx->x_offset = first_offset;
+  render_digit(r, score%10, cx);
+  if (score == 10) {
+    cx->x_offset = second_offset;
+    render_digit(r, 1, cx);
+  }
+}
+
+void
+render_score(SDL_Renderer *r,
+             const struct Score *s,
+             const struct Dimensions *screen)
+{
+  struct DigitRenderingContext cx = {
+    .x_offset = 0,
+    .direction = LEFT,
+    .within = screen
+  };
+  render_single_score(r, s->player, &cx);
+  cx.direction = RIGHT;
+  render_single_score(r, s->enemy, &cx);
+}
+
+void
+render(SDL_Renderer *r, const struct PlayState *p) {
   SDL_SetRenderDrawColor(r, BG_R, BG_G, BG_B, BG_A);
   SDL_RenderClear(r);
   SDL_SetRenderDrawColor(r, FG_R, FG_G, FG_B, FG_A);
   render_racket(r, 0, p->player.y);
-  render_racket(r, screen->width - RACKET_WIDTH, p->enemy.y);
-  render_pong_ball(r, &p->pong);
-  render_midline(r, screen);
+  render_racket(r, p->frame->width - RACKET_WIDTH, p->enemy.y);
+  render_pong_ball(r, &p->ball);
+  render_midline(r, p->frame);
+  render_score(r, &p->score, p->frame);
   SDL_RenderPresent(r);
+}
+
+void
+check_finish_round(struct Game *g) {
+  struct Score *s;
+
+  s = &g->play.score;
+  if (s->player >= END_SCORE || s->enemy >= END_SCORE) {
+    SDL_ShowSimpleMessageBox(
+      SDL_MESSAGEBOX_INFORMATION,
+      "End Round",
+      s->player >= END_SCORE ?
+        "You won! Go another round." :
+        "You lost. Try again.",
+      g->video.window
+    );
+    reset_game(&g->play);
+  }
 }
 
 void
@@ -221,17 +552,18 @@ game_main(struct Game *g) {
       }
       handle_event(&g->play, &e);
     }
-    play(&g->play, &g->video.dim, SDL_GetTicks());
-    render(g->video.renderer, &g->play, &g->video.dim);
+    play(&g->play, SDL_GetTicks());
+    render(g->video.renderer, &g->play);
     delta = SDL_GetTicks() - last;
     if (delta < MAX_WAIT) {
       SDL_Delay(MAX_WAIT - delta);
     }
+    check_finish_round(g);
   }
 }
 
 void
-start_game(struct Game* g, const char *title) {
+run_game(struct Game* g, const char *title) {
   init_video(&g->video, title);
   if (errorFn) {
     return;
@@ -250,7 +582,7 @@ main(int argc, char *argv[]) {
   game.video.dim.width = 640;
   game.video.dim.height = 480;
 
-  start_game(&game, TITLE);
+  run_game(&game, TITLE);
   if (errorFn) {
     fprintf(stderr, "Error: %s\n", errorFn());
     return 1;

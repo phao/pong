@@ -5,7 +5,7 @@ CC_DEFAULT_OPTS=-Wall -Wextra -std=c99 -pedantic $(DEBUG_OPTS) \
 	$(OPTIMIZATION_OPTS)
 
 # Other options for SDL extension libraries include -lSDL2_ttf -lSDL2_mixer.
-SDL_LINKER_OPTS=-lSDL2 -lSDL2_image
+LINKER_OPTS=-lSDL2 -lSDL2_image -lm
 
 OBJS=main.o
 
@@ -13,7 +13,7 @@ OBJS=main.o
 	$(CC) $(CC_DEFAULT_OPTS) -c $<
 
 all: $(OBJS)
-	$(CC) *.o -o main $(SDL_LINKER_OPTS)
+	$(CC) *.o -o main $(LINKER_OPTS)
 
 run: all
 	./main
