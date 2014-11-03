@@ -215,7 +215,8 @@ void
 toggle_ball(struct PongBall *ball) {
   float angle;
 
-  angle = rand()/(float)RAND_MAX * M_PI/1.8f - 5.0f*M_PI/18.0f;
+  angle = rand()/(float)RAND_MAX * RACKET_HITBACK_MAXANGLE*2.0f -
+    RACKET_HITBACK_MAXANGLE;
   ball->dy = sinf(angle);
   ball->dx = ball->dx < 0 ? cosf(angle) : -cosf(angle);
 }
