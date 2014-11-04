@@ -47,7 +47,7 @@ struct Score {
 struct PlayState {
   struct Racket player, enemy;
   struct PongBall ball;
-  Uint32 last_update;
+  Uint32 last_update_ms;
   struct Score score;
 
   // Dimmensions of the frame within which the game is played.
@@ -279,24 +279,24 @@ fclamp0(float x, float max) {
 }
 
 void
-move_racket(struct Racket *r, Uint32 delta, float maxY) {
-  r->y += delta * RACKET_MS_SPEED * r->dy;
+move_racket(struct Racket *r, Uint32 delta_ms, float maxY) {
+  r->y += delta_ms * RACKET_MS_SPEED * r->dy;
   r->y = fclamp0(r->y, maxY);
 }
 
 void
-move_pong_ball(struct PongBall *ball, Uint32 delta) {
-  ball->x += ball->dx * delta * PONG_BALL_MS_SPEED;
-  ball->y += ball->dy * delta * PONG_BALL_MS_SPEED;
+move_pong_ball(struct PongBall *ball, Uint32 delta_ms) {
+  ball->x += ball->dx * delta_ms * PONG_BALL_MS_SPEED;
+  ball->y += ball->dy * delta_ms * PONG_BALL_MS_SPEED;
   ball->x = fclamp0(ball->x, ball->within->width);
   ball->y = fclamp0(ball->y, ball->within->height - PONG_BALL_SIZE);
 }
 
 void
-play_movements(struct PlayState *p, Uint32 delta) {
-  move_racket(&p->player, delta, p->frame->height - RACKET_HEIGHT);
-  move_racket(&p->enemy, delta, p->frame->height - RACKET_HEIGHT);
-  move_pong_ball(&p->ball, delta);
+play_movements(struct PlayState *p, Uint32 delta_ms) {
+  move_racket(&p->player, delta_ms, p->frame->height - RACKET_HEIGHT);
+  move_racket(&p->enemy, delta_ms, p->frame->height - RACKET_HEIGHT);
+  move_pong_ball(&p->ball, delta_ms);
 }
 
 void
@@ -366,13 +366,13 @@ score(struct PongBall *ball, int *benefit) {
  * current play state.
  */
 void
-run_collisions(struct PlayState *p, Uint32 delta) {
+run_collisions(struct PlayState *p, Uint32 delta_ms) {
   struct PongBall *ball;
   float xp, yp; // These are x prime and y prime, the next (x,y) for ball.
 
   ball = &p->ball;
-  xp = ball->x + ball->dx*delta*PONG_BALL_MS_SPEED;
-  yp = ball->y + ball->dy*delta*PONG_BALL_MS_SPEED;
+  xp = ball->x + ball->dx*delta_ms*PONG_BALL_MS_SPEED;
+  yp = ball->y + ball->dy*delta_ms*PONG_BALL_MS_SPEED;
 
   // A ball can collide with the top/bottom walls, in which case its dy changes
   // sign.
@@ -395,19 +395,19 @@ run_collisions(struct PlayState *p, Uint32 delta) {
 
 void
 reset_game(struct PlayState *p) {
-  p->last_update = SDL_GetTicks();
+  p->last_update_ms = SDL_GetTicks();
   init_play(p, p->frame);
 }
 
 void
-play(struct PlayState *p, Uint32 now) {
-  Uint32 delta;
+play(struct PlayState *p, Uint32 now_ms) {
+  Uint32 delta_ms;
 
-  delta = now - p->last_update;
-  run_collisions(p, delta);
+  delta_ms = now_ms - p->last_update_ms;
+  run_collisions(p, delta_ms);
   play_enemy(&p->enemy, &p->ball);
-  play_movements(p, delta);
-  p->last_update = now;
+  play_movements(p, delta_ms);
+  p->last_update_ms = now_ms;
 }
 
 void
@@ -576,15 +576,15 @@ game_main(struct Game *g) {
   enum {
     FPS = 60,
     SEC = 1000,
-    MAX_WAIT = SEC/FPS
+    MAX_WAIT_MS = SEC/FPS
   };
 
   SDL_Event e;
-  Uint32 last, delta;
+  Uint32 last_ms, delta_ms;
 
-  g->play.last_update = SDL_GetTicks();
+  g->play.last_update_ms = SDL_GetTicks();
   for (;;) {
-    last = SDL_GetTicks();
+    last_ms = SDL_GetTicks();
     while (SDL_PollEvent(&e)) {
       if (e.type == SDL_QUIT) {
         return;
@@ -593,9 +593,9 @@ game_main(struct Game *g) {
     }
     play(&g->play, SDL_GetTicks());
     render(g->video.renderer, &g->play);
-    delta = SDL_GetTicks() - last;
-    if (delta < MAX_WAIT) {
-      SDL_Delay(MAX_WAIT - delta);
+    delta_ms = SDL_GetTicks() - last_ms;
+    if (delta_ms < MAX_WAIT_MS) {
+      SDL_Delay(MAX_WAIT_MS - delta_ms);
     }
     check_finish_round(g);
   }
