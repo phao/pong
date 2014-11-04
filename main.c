@@ -73,7 +73,7 @@ struct DigitRenderingContext {
 enum {
   RACKET_WIDTH = 20,
   RACKET_HEIGHT = RACKET_WIDTH*3,
-  RACKET_SPEED = 450 /* Pixels per second. */
+  RACKET_SPEED = 550 /* Pixels per second. */
 };
 
 const float RACKET_MS_SPEED = RACKET_SPEED/1000.0f;
@@ -113,10 +113,11 @@ enum {
 
 // The distance the enemy is willing to tolerate and wait before he starts
 // to go after the ball. If the ball is less than ENEMY_WAIT_TOLERANCE pixels
-// above/below is center, it'll wait; otherwise it'll pursue the ball.
+// above/below its center, it'll wait; otherwise it'll pursue the ball.
 const float ENEMY_WAIT_TOLERANCE = RACKET_HEIGHT/5.0f;
 
 enum {
+  // This can be any integer from 1 to 99, inclusive.
   END_SCORE = 10
 };
 
@@ -487,21 +488,30 @@ render_digit(SDL_Renderer *r,
   }
 }
 
+int
+is2digits(int x) {
+  return x >= 10;
+}
+
 void
 render_single_score(SDL_Renderer *r,
                     int score,
                     struct DigitRenderingContext *cx)
 {
   int first_offset, second_offset;
+  int is2digs;
 
   assert(score >= 0);
-  assert(score <= 10);
+  assert(score <= END_SCORE);
 
   first_offset = cx->direction * DIGIT_OUTER_MARGIN*DIGIT_PIECE_SIZE;
   second_offset = cx->direction *
     DIGIT_PIECE_SIZE*(DIGIT_OUTER_MARGIN + DIGIT_INNER_MARGIN + DIGIT_WIDTH);
 
-  if (cx->direction == RIGHT && score == 10) {
+  is2digs = is2digits(score);
+  if (cx->direction == RIGHT && is2digs) {
+    // I always wanted the opportunity to use this kind of swap. Here it is,
+    // for the first time in 9 years of programming.
     first_offset = first_offset ^ second_offset;
     second_offset = first_offset ^ second_offset;
     first_offset = first_offset ^ second_offset;
@@ -509,9 +519,9 @@ render_single_score(SDL_Renderer *r,
 
   cx->x_offset = first_offset;
   render_digit(r, score%10, cx);
-  if (score == 10) {
+  if (is2digs) {
     cx->x_offset = second_offset;
-    render_digit(r, 1, cx);
+    render_digit(r, score/10, cx);
   }
 }
 
