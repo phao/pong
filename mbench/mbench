@@ -4,7 +4,7 @@ for a in *.c
 do
 echo $a
 gcc -march=native -O3 -std=c99 -Wall -pedantic -Wextra $a
-time ./a.out
+/usr/bin/time -v ./a.out
 echo
 done
 

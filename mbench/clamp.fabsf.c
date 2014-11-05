@@ -20,5 +20,6 @@ int main() {
     fs[i] -= 1.0f;
     fs[i] = fclamp0(fs[i], F_MAX);
   }
+  free(fs);
   return 0;
 }
