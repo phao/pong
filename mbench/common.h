@@ -4,4 +4,4 @@ enum {
 };
 
 const float F_MAX = 0.8123f;
-const float D_MAX = 0.8123;
+const double D_MAX = 0.8123;
