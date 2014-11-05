@@ -21,8 +21,5 @@ make sure to set the warning levels up and set some debugging information:
 
   * `gcc -Wall -Wextra -std=c99 -pedantic -g main.c -lm -lSDL2`
 
-This mode should only complain of the unused parameters in main, which seem
-to be required by SDL2, for some reason I still don't know.
-
 There is a video I recorded of me playing, and loosing, the game =D =>
 http://youtu.be/W5hXXdwJsQU
