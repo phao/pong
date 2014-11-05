@@ -614,6 +614,9 @@ run_game(struct Game* g, const char *title) {
 
 int
 main(int argc, char *argv[]) {
+  (void) argc;
+  (void) argv;
+
   const char *TITLE = "PONG";
 
   struct Game game;
