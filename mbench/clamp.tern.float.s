@@ -1,4 +1,4 @@
-	.file	"clamp.tern.double.c"
+	.file	"clamp.tern.float.c"
 	.section	.rodata.str1.1,"aMS",@progbits,1
 .LC4:
 	.string	"%f secs\n"
@@ -12,7 +12,7 @@ main:
 	pushq	%r13
 	.cfi_def_cfa_offset 16
 	.cfi_offset 13, -16
-	movl	$800000000, %edi
+	movl	$400000000, %edi
 	pushq	%r12
 	.cfi_def_cfa_offset 24
 	.cfi_offset 12, -24
@@ -34,26 +34,26 @@ main:
 	.p2align 3
 .L5:
 	call	rand
-	vcvtsi2sd	%eax, %xmm0, %xmm0
-	vdivsd	.LC2(%rip), %xmm0, %xmm0
-	vaddsd	%xmm0, %xmm0, %xmm0
-	vsubsd	.LC3(%rip), %xmm0, %xmm0
-	vmovsd	%xmm0, 8(%rsp)
+	vcvtsi2ss	%eax, %xmm0, %xmm0
+	vmulss	.LC2(%rip), %xmm0, %xmm0
+	vaddss	%xmm0, %xmm0, %xmm0
+	vsubss	.LC3(%rip), %xmm0, %xmm0
+	vmovss	%xmm0, 12(%rsp)
 	call	SDL_GetPerformanceCounter
-	vmovsd	.LC0(%rip), %xmm1
-	vmovsd	8(%rsp), %xmm0
+	vmovss	.LC0(%rip), %xmm1
+	vmovss	12(%rsp), %xmm0
 	movq	%rax, %r12
-	vucomisd	%xmm1, %xmm0
+	vucomiss	%xmm1, %xmm0
 	ja	.L2
-	vxorpd	%xmm2, %xmm2, %xmm2
-	vmaxsd	%xmm0, %xmm2, %xmm1
+	vxorps	%xmm2, %xmm2, %xmm2
+	vmaxss	%xmm0, %xmm2, %xmm1
 .L2:
-	vmovsd	%xmm1, 0(%r13,%rbx)
-	addq	$8, %rbx
+	vmovss	%xmm1, 0(%r13,%rbx)
+	addq	$4, %rbx
 	call	SDL_GetPerformanceCounter
 	subq	%r12, %rax
 	addq	%rax, %rbp
-	cmpq	$800000000, %rbx
+	cmpq	$400000000, %rbx
 	jne	.L5
 	movq	%r13, %rdi
 	call	free
@@ -118,18 +118,15 @@ D_MAX:
 	.size	F_MAX, 4
 F_MAX:
 	.long	1062204133
-	.section	.rodata.cst8,"aM",@progbits,8
-	.align 8
+	.section	.rodata.cst4,"aM",@progbits,4
+	.align 4
 .LC0:
-	.long	2446413372
-	.long	1072299612
-	.align 8
+	.long	1062204133
+	.align 4
 .LC2:
-	.long	4290772992
-	.long	1105199103
-	.align 8
+	.long	805306368
+	.align 4
 .LC3:
-	.long	0
-	.long	1072693248
+	.long	1065353216
 	.ident	"GCC: (Ubuntu 4.8.2-19ubuntu1) 4.8.2"
 	.section	.note.GNU-stack,"",@progbits

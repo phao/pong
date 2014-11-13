@@ -1,6 +1,6 @@
-	.file	"clamp.tern.double.c"
+	.file	"clamp.fabsf.c"
 	.section	.rodata.str1.1,"aMS",@progbits,1
-.LC4:
+.LC5:
 	.string	"%f secs\n"
 	.section	.text.startup,"ax",@progbits
 	.p2align 4,,15
@@ -12,7 +12,7 @@ main:
 	pushq	%r13
 	.cfi_def_cfa_offset 16
 	.cfi_offset 13, -16
-	movl	$800000000, %edi
+	movl	$400000000, %edi
 	pushq	%r12
 	.cfi_def_cfa_offset 24
 	.cfi_offset 12, -24
@@ -32,42 +32,45 @@ main:
 	call	srand
 	.p2align 4,,10
 	.p2align 3
-.L5:
+.L3:
 	call	rand
-	vcvtsi2sd	%eax, %xmm0, %xmm0
-	vdivsd	.LC2(%rip), %xmm0, %xmm0
-	vaddsd	%xmm0, %xmm0, %xmm0
-	vsubsd	.LC3(%rip), %xmm0, %xmm0
-	vmovsd	%xmm0, 8(%rsp)
+	vcvtsi2ss	%eax, %xmm1, %xmm1
+	vmulss	.LC0(%rip), %xmm1, %xmm1
+	vaddss	%xmm1, %xmm1, %xmm1
+	vsubss	.LC1(%rip), %xmm1, %xmm1
+	vmovss	%xmm1, 12(%rsp)
 	call	SDL_GetPerformanceCounter
-	vmovsd	.LC0(%rip), %xmm1
-	vmovsd	8(%rsp), %xmm0
+	vmovss	12(%rsp), %xmm1
 	movq	%rax, %r12
-	vucomisd	%xmm1, %xmm0
-	ja	.L2
-	vxorpd	%xmm2, %xmm2, %xmm2
-	vmaxsd	%xmm0, %xmm2, %xmm1
-.L2:
-	vmovsd	%xmm1, 0(%r13,%rbx)
-	addq	$8, %rbx
+	vaddss	.LC2(%rip), %xmm1, %xmm2
+	vsubss	.LC2(%rip), %xmm1, %xmm0
+	vandps	.LC3(%rip), %xmm0, %xmm0
+	vsubss	%xmm0, %xmm2, %xmm0
+	vmulss	.LC4(%rip), %xmm0, %xmm0
+	vmovaps	%xmm0, %xmm1
+	vandps	.LC3(%rip), %xmm1, %xmm1
+	vaddss	%xmm1, %xmm0, %xmm0
+	vmulss	.LC4(%rip), %xmm0, %xmm0
+	vmovss	%xmm0, 0(%r13,%rbx)
+	addq	$4, %rbx
 	call	SDL_GetPerformanceCounter
 	subq	%r12, %rax
 	addq	%rax, %rbp
-	cmpq	$800000000, %rbx
-	jne	.L5
+	cmpq	$400000000, %rbx
+	jne	.L3
 	movq	%r13, %rdi
 	call	free
 	call	SDL_GetPerformanceFrequency
 	testq	%rbp, %rbp
-	js	.L6
+	js	.L4
 	vcvtsi2sdq	%rbp, %xmm0, %xmm0
-.L7:
+.L5:
 	testq	%rax, %rax
-	js	.L8
+	js	.L6
 	vcvtsi2sdq	%rax, %xmm1, %xmm1
-.L9:
+.L7:
 	vdivsd	%xmm1, %xmm0, %xmm0
-	movl	$.LC4, %esi
+	movl	$.LC5, %esi
 	movl	$1, %edi
 	movl	$1, %eax
 	call	__printf_chk
@@ -84,7 +87,7 @@ main:
 	popq	%r13
 	.cfi_def_cfa_offset 8
 	ret
-.L6:
+.L4:
 	.cfi_restore_state
 	movq	%rbp, %rdx
 	andl	$1, %ebp
@@ -92,15 +95,15 @@ main:
 	orq	%rbp, %rdx
 	vcvtsi2sdq	%rdx, %xmm0, %xmm0
 	vaddsd	%xmm0, %xmm0, %xmm0
-	jmp	.L7
-.L8:
+	jmp	.L5
+.L6:
 	movq	%rax, %rdx
 	andl	$1, %eax
 	shrq	%rdx
 	orq	%rax, %rdx
 	vcvtsi2sdq	%rdx, %xmm1, %xmm1
 	vaddsd	%xmm1, %xmm1, %xmm1
-	jmp	.L9
+	jmp	.L7
 	.cfi_endproc
 .LFE571:
 	.size	main, .-main
@@ -118,18 +121,26 @@ D_MAX:
 	.size	F_MAX, 4
 F_MAX:
 	.long	1062204133
-	.section	.rodata.cst8,"aM",@progbits,8
-	.align 8
+	.section	.rodata.cst4,"aM",@progbits,4
+	.align 4
 .LC0:
-	.long	2446413372
-	.long	1072299612
-	.align 8
+	.long	805306368
+	.align 4
+.LC1:
+	.long	1065353216
+	.align 4
 .LC2:
-	.long	4290772992
-	.long	1105199103
-	.align 8
+	.long	1062204133
+	.section	.rodata.cst16,"aM",@progbits,16
+	.align 16
 .LC3:
+	.long	2147483647
 	.long	0
-	.long	1072693248
+	.long	0
+	.long	0
+	.section	.rodata.cst4
+	.align 4
+.LC4:
+	.long	1056964608
 	.ident	"GCC: (Ubuntu 4.8.2-19ubuntu1) 4.8.2"
 	.section	.note.GNU-stack,"",@progbits
