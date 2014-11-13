@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
@@ -118,7 +119,7 @@ const float ENEMY_WAIT_TOLERANCE = RACKET_HEIGHT/5.0f;
 
 enum {
   // This can be any integer from 1 to 99, inclusive.
-  END_SCORE = 10
+  END_SCORE = 30
 };
 
 enum {
@@ -499,7 +500,6 @@ render_single_score(SDL_Renderer *r,
                     struct DigitRenderingContext *cx)
 {
   int first_offset, second_offset;
-  int is2digs;
 
   assert(score >= 0);
   assert(score <= END_SCORE);
@@ -508,20 +508,22 @@ render_single_score(SDL_Renderer *r,
   second_offset = cx->direction *
     DIGIT_PIECE_SIZE*(DIGIT_OUTER_MARGIN + DIGIT_INNER_MARGIN + DIGIT_WIDTH);
 
-  is2digs = is2digits(score);
-  if (cx->direction == RIGHT && is2digs) {
-    // I always wanted the opportunity to use this kind of swap. Here it is,
-    // for the first time in 9 years of programming.
-    first_offset = first_offset ^ second_offset;
-    second_offset = first_offset ^ second_offset;
-    first_offset = first_offset ^ second_offset;
-  }
-
-  cx->x_offset = first_offset;
-  render_digit(r, score%10, cx);
-  if (is2digs) {
+  if (is2digits(score)) {
+    if (cx->direction == RIGHT) {
+      // I always wanted the opportunity to use this kind of swap. Here it is,
+      // for the first time in 9 years of programming.
+      first_offset = first_offset ^ second_offset;
+      second_offset = first_offset ^ second_offset;
+      first_offset = first_offset ^ second_offset;
+    }
+    cx->x_offset = first_offset;
+    render_digit(r, score%10, cx);
     cx->x_offset = second_offset;
     render_digit(r, score/10, cx);
+  }
+  else {
+    cx->x_offset = first_offset;
+    render_digit(r, score, cx);
   }
 }
 

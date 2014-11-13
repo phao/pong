@@ -1,9 +1,11 @@
 #include <stdlib.h>
 #include <math.h>
 
+#include <SDL2/SDL.h>
+
 #include "common.h"
 
-float fclamp0(float x, float max) {
+static float fclamp0(float x, float max) {
   x = (x + max - fabsf(x - max))/2.0f;
   return (x + fabsf(x))/2.0f;
 }
@@ -11,15 +13,20 @@ float fclamp0(float x, float max) {
 int main() {
   float *fs;
   int i;
+  Uint64 c, acc;
 
   fs = malloc(SIZE * sizeof (float));
   srand(SEED);
+  acc = 0;
   for (i = 0; i < SIZE; i++) {
     fs[i] = rand()/(float)RAND_MAX;
     fs[i] *= 2.0f;
     fs[i] -= 1.0f;
+    c = SDL_GetPerformanceCounter();
     fs[i] = fclamp0(fs[i], F_MAX);
+    acc += SDL_GetPerformanceCounter() - c;
   }
   free(fs);
+  printf("%f secs\n", acc/(double) SDL_GetPerformanceFrequency());
   return 0;
 }
